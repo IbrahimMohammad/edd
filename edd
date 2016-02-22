@@ -1,0 +1,80 @@
+#!/bin/bash
+
+# Export Derby Data (edd) by ibrahim mohammad
+# Email: ibrahim.mohammad.2015@gmail.com
+# GitHub repository: https://github.com/IbrahimMohammad/edd
+# No Rights Reserved
+
+to_sqlite()
+{
+    columns_cnt=$(echo $get_columns | sed 's/.*|//' | cut -d ' ' -f 2)
+    columns=$(echo $get_columns | sed 's/.*-//')
+    columns_list=\(
+    # for every column
+    for ((x=1; x<=columns_cnt*7; x+=7)); do
+        column=$(echo $columns | cut -d '|' -f $x | cut -d ' ' -f 2)
+        type=$(echo $columns | cut -d '|' -f $((x+1)) | cut -d ' ' -f 1)
+        # change to sqlite data types
+#        case $type in
+#            VARCHAR) type=TEXT
+#                ;;
+#            INTEGER)
+#                ;;
+#            *) echo "$table table have $column column with $type type"
+#               exit 1
+#                ;;
+#        esac
+        # build columns list
+        if ((x  == columns_cnt*7-6)); then
+            columns_list+="$column $type);"
+        else
+            columns_list+="$column $type, "
+        fi
+    done
+    # create the table
+    sqlite3 ${database_name}.sqlite <<_EOF_
+create table $table $columns_list
+.mode csv
+.import ${database_name}.csv/${table}.csv $table
+.exit
+_EOF_
+}
+
+# here we go!
+database=\'jdbc:derby:$1\'
+# get tables names
+get_tables=$(ij <<_EOF_
+connect $database;
+show tables;
+exit;
+_EOF_
+)
+all_tables_cnt=$(echo $get_tables | sed 's/.*| //' | cut -d ' ' -f 1)
+sys_tables_cnt=$(echo $get_tables | grep -o ' SYS |' | wc -l)
+tables_cnt=$((all_tables_cnt-sys_tables_cnt))
+tables=$(echo $get_tables | sed "s/.*| SYS |//" | cut -d '|' -f 1 --complement)
+database_name=$(basename $1)
+mkdir ${database_name}.csv
+# for every table
+for ((i=2; i<=tables_cnt*2; i+=2)); do
+    table=$(echo $tables | cut -d '|' -f $i | cut -d ' ' -f 1)
+    get_columns=$(ij <<_EOF_
+connect $database;
+describe $table;
+exit;
+_EOF_
+)
+    if echo $get_columns | grep -qF 'No table exists'; then
+        continue
+    fi
+    # export table
+    ij &> /dev/null <<_EOF_
+connect $database;
+CALL SYSCS_UTIL.SYSCS_EXPORT_TABLE (null,'$table','${database_name}.csv/${table}.csv',null,null,null);
+exit;
+_EOF_
+    if [[ $2 == -sqlite ]]; then
+        to_sqlite
+    fi
+done
+exit

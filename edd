@@ -8,12 +8,11 @@
 to_sqlite()
 {
     columns_cnt=$(echo $get_columns | sed 's/.*|//' | cut -d ' ' -f 2)
-    columns=$(echo $get_columns | sed 's/.*-//')
     columns_list=\(
     # for every column
     for ((x=1; x<=columns_cnt*7; x+=7)); do
-        column=$(echo $columns | cut -d '|' -f $x | cut -d ' ' -f 2)
-        type=$(echo $columns | cut -d '|' -f $((x+1)) | cut -d ' ' -f 1)
+        column=$(echo $get_columns | sed 's/.*-//' | cut -d '|' -f $x | cut -d ' ' -f 2)
+        type=$(echo $get_columns | sed 's/.*-//' | cut -d '|' -f $((x+1)) | cut -d ' ' -f 1)
         # change to sqlite data types
 #        case $type in
 #            VARCHAR) type=TEXT
